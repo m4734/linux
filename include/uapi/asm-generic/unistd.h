@@ -845,8 +845,11 @@ __SYSCALL(__NR_fsmount, sys_fsmount)
 #define __NR_fspick 433
 __SYSCALL(__NR_fspick, sys_fspick)
 
+#define __NR_pmc 434 //cgmin
+__SYSCALL(__NR_pmc, sys_pmc)
+
 #undef __NR_syscalls
-#define __NR_syscalls 434
+#define __NR_syscalls 435 // cgmin 434->435
 
 /*
  * 32 bit systems traditionally used different
