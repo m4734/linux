@@ -355,7 +355,7 @@
 431	common	fsconfig		__x64_sys_fsconfig
 432	common	fsmount			__x64_sys_fsmount
 433	common	fspick			__x64_sys_fspick
-434 64	pmc					sys_pmc
+434 common	pmc					__x64_sys_pmc
 #cgmin
 
 #
