@@ -449,3 +449,4 @@ COND_SYSCALL(setuid16);
 COND_SYSCALL(rseq);
 
 COND_SYSCALL(pmc); //cgmin
+COND_SYSCALL(pmc2); //cgmin

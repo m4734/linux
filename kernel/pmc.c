@@ -7,6 +7,8 @@
 #include <asm/pgtable.h>
 //#include <linux/mm.h>
 
+//cgmin pmc
+
 long dwc(unsigned long src, unsigned long dst, unsigned long size) // double walk and change
 {
 
@@ -102,32 +104,47 @@ long dwc(unsigned long src, unsigned long dst, unsigned long size) // double wal
 	//do we need lock?
 //	pte_src = pte_offset_map(pmd_src,address_src);
 	pte_src = pte_offset_map_lock(mm,pmd_src,address_src,&ptl_src);	
-	if (pte_none(*pte_src))
+	if (pte_none(*pte_src) || !pte_present(*pte_src))
 	{
+			spin_unlock(ptl_src);
+			__put_user(0,(char __user *)address_src);
+			spin_lock(ptl_src);
+			/*
 			if (ptl_src != NULL)
 				spin_unlock(ptl_src);
 			return rv;
+			*/
 	}
+	/*
 	if (!pte_present(*pte_src))
 	{
 			if (ptl_src != NULL)
 				spin_unlock(ptl_src);
 			return rv;
 	}
+	*/
+//	printk("p9\n");
 //	pte_dst = pte_offset_map(pmd_dst,address_dst);
-	if (pmd_dst->pmd != pmd_src->pmd)
-		pte_dst = pte_offset_map_lock(mm,pmd_dst,address_dst,&ptl_dst);
-	else
+	if (pmd_dst->pmd == pmd_src->pmd)
 		pte_dst = pte_offset_map(pmd_dst,address_dst);
-
-	if (pte_none(*pte_dst))
+	else
 	{
+		pte_dst = pte_offset_map_lock(mm,pmd_dst,address_dst,&ptl_dst);
+
+	if (pte_none(*pte_dst) || !pte_present(*pte_dst))
+	{
+			spin_unlock(ptl_dst);
+			__put_user(0,(char __user *)address_dst);
+			spin_lock(ptl_dst);
+			/*
 			if (ptl_src != NULL)
 				spin_unlock(ptl_src);
 			if (ptl_dst != NULL)
 				spin_unlock(ptl_dst);
 			return rv;
+			*/
 	}
+	/*
 	if (!pte_present(*pte_dst))
 	{
 			if (ptl_src != NULL)
@@ -136,7 +153,8 @@ long dwc(unsigned long src, unsigned long dst, unsigned long size) // double wal
 				spin_unlock(ptl_dst);
 			return rv;
 	}
-
+	*/
+	}
 //	printk("ready\n");
 //	printk("%lx",address_src);
 //	printk("%lx %lx %lx %lx %lx",pgd_page_vaddr(pgd_src),p4d_page_vaddr(p4d_src),pud_page_vaddr(pud_src),pmd_page_vaddr(pmd),pte_page_vaddr(pte));
@@ -303,5 +321,40 @@ SYSCALL_DEFINE3(pmc, void*, src, void*, dst, unsigned long, size)
 		if (rv == -1)
 				printk("dwc error\n");
 
-		return 0;
+		return rv;
+}
+
+SYSCALL_DEFINE4(pmc2, void*, src, void*, dst, void*, size, unsigned long, cnt)
+{
+		unsigned long i,_size,size2;
+		void *_src,*_dst;
+		long rv = 0;
+		for (i=0;i<cnt;++i)
+		{
+//				printk("i %lu\n",i);
+				copy_from_user(&_size,size+i*8,8); // every time?
+				copy_from_user(&_src,src+i*8,8);
+				copy_from_user(&_dst,dst+i*8,8);
+//				printk("%lu\n",_size);
+//				printk("%lx %lx %lu\n",(unsigned long)_src,(unsigned long)_dst,_size);
+				
+			if (((unsigned long)_src) % PAGE_SIZE == 0 && ((unsigned long)_dst) % PAGE_SIZE == 0)
+			{
+					size2 = _size%PAGE_SIZE;
+//					printk("dwc %lx %lx %lu\n",src[i],dst[i],size[i]-size2);
+					dwc((unsigned long)_src,(unsigned long)_dst,(_size-size2)/PAGE_SIZE);
+					if (size2 > 0)
+					{
+							printk("memcpy %lu\n",size2);
+//						memcpy((unsigned long)dst[i]+(size[i]-size2),(unsigned long)src[i]+(size[i]-size2),size2);
+					}
+			}
+			else
+			{
+					printk("align error\n");
+//					memcpy(dst[i],src[i],size[i]);
+			}
+			
+		}
+		return rv;
 }

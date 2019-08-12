@@ -1398,5 +1398,6 @@ static inline unsigned int ksys_personality(unsigned int personality)
 }
 
 asmlinkage long sys_pmc(void* src, void* dst, unsigned long size); //cgmin
+asmlinkage long sys_pmc2(void* src, void* dst, void* size, unsigned long cnt);
 
 #endif
