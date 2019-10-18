@@ -450,3 +450,4 @@ COND_SYSCALL(rseq);
 
 COND_SYSCALL(pmc); //cgmin
 COND_SYSCALL(pmc2); //cgmin
+COND_SYSCALL(pmcf); //cgmin

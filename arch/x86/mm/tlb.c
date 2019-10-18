@@ -635,6 +635,7 @@ static void flush_tlb_func_common(const struct flush_tlb_info *f,
 	this_cpu_write(cpu_tlbstate.ctxs[loaded_mm_asid].tlb_gen, mm_tlb_gen);
 }
 
+
 static void flush_tlb_func_local(const void *info, enum tlb_flush_reason reason)
 {
 	const struct flush_tlb_info *f = info;
@@ -795,17 +796,34 @@ void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 	}
 
 	if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids)
+	{
 		flush_tlb_others(mm_cpumask(mm), info);
+	}
 
 	put_flush_tlb_info();
 	put_cpu();
 }
+/*
+static void flush_tlb_func_local_pmc(void *info) //cgmin
+{
+	__flush_tlb_one_uesr_pmc((unsigned long*)info);
+}
 
-
+void flush_tlb_local_pmc(unsigned long addr) //cgmin
+{
+		on_each_cpu(flush_tlb_func_local_pmc,(void*) &addr,1);
+}
+*/
 static void do_flush_tlb_all(void *info)
 {
 	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH_RECEIVED);
 	__flush_tlb_all();
+}
+
+static void do_flush_tlb_all_pmc(void *info) //cgmin
+{
+	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH_RECEIVED);
+	__flush_tlb_all_pmc();
 }
 
 void flush_tlb_all(void)
@@ -813,6 +831,13 @@ void flush_tlb_all(void)
 	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH);
 	on_each_cpu(do_flush_tlb_all, NULL, 1);
 }
+
+void flush_tlb_all_pmc(void) //cgmin
+{
+	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH);
+	on_each_cpu(do_flush_tlb_all_pmc, NULL, 1);
+}
+
 
 static void do_kernel_range_flush(void *info)
 {

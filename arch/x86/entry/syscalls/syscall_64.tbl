@@ -357,6 +357,7 @@
 433	common	fspick			__x64_sys_fspick
 434 common	pmc					__x64_sys_pmc
 435 common	pmc2				__x64_sys_pmc2
+436 common	pmcf				__x64_sys_pmcf
 #cgmin
 
 #

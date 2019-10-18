@@ -8,9 +8,17 @@
 //#include <linux/mm.h>
 
 //cgmin pmc
-
+/*
+struct pmc_data
+{
+		unsigned long addr;
+		unsigned int loaded_mm_asid;
+};
+*/
 long dwc(unsigned long src, unsigned long dst, unsigned long size) // double walk and change
 {
+	struct pmc_data data;
+	data.loaded_mm_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
 
 	struct	mm_struct *mm;
 
@@ -182,8 +190,21 @@ long dwc(unsigned long src, unsigned long dst, unsigned long size) // double wal
 	*pte_dst = *pte_src;
 	*pte_src = pte_temp;
 
-	__flush_tlb_one_user(address_src);
-	__flush_tlb_one_user(address_dst);
+	barrier();
+//on_each_cpu(__flush_tlb_one_user_pmc,(void*)&address_src,1);
+//on_each_cpu(__flush_tlb_one_user_pmc,(void*)&address_dst,1);
+printk("src %lu\n",address_src);
+data.addr = address_src;
+on_each_cpu(__flush_tlb_one_user_pmc,(void*) &data,1);
+barrier();
+printk("dst %lu\n",address_dst);
+data.addr = address_dst;
+on_each_cpu(__flush_tlb_one_user_pmc,(void*) &data,1);
+barrier();
+
+
+//	__flush_tlb_one_user(address_src);
+//	__flush_tlb_one_user(address_dst);
 
 	cnt = 1;
 
@@ -281,8 +302,33 @@ long dwc(unsigned long src, unsigned long dst, unsigned long size) // double wal
 			*pte_dst = *pte_src;
 			*pte_src = pte_temp;
 
-			__flush_tlb_one_user(address_src);
-			__flush_tlb_one_user(address_dst);
+//			__flush_tlb_one_user(address_src);
+//			__flush_tlb_one_user(address_dst);
+/*
+flush_tlb_mm_range(current->mm,address_src,address_src,PAGE_SHIFT,true);
+flush_tlb_mm_range(current->mm,address_dst,address_dst,PAGE_SHIFT,true);
+struct flush_tlb_info *info;
+info = get_flush_tlb_info(current->mm,address_src,address_src,PAGE_SHIFT,true,inc_mm_tlb_get(current->mm));
+on_each_cpu(flush_tlb_func_remote,(void *)info,1);
+put_flush_tlb_info();
+info = get_flush_tlb_info(current->mm,address_src,address_src,PAGE_SHIFT,true,inc_mm_tlb_get(current->mm));
+on_each_cpu(flush_tlb_func_remote,(void *)info,1);
+put_flush_tlb_info();
+*/
+//on_each_cpu(__native_flush_tlb_one_user,address_src,1);
+//on_each_cpu(__native_flush_tlb_one_user,address_dst,1);
+
+barrier();
+//on_each_cpu(__flush_tlb_one_user_pmc,(void*) &address_src,1);
+//on_each_cpu(__flush_tlb_one_user_pmc,(void*) &address_dst,1);
+data.addr = address_src;
+on_each_cpu(__flush_tlb_one_user_pmc,(void*) &data,1);
+barrier();
+data.addr = address_dst;
+on_each_cpu(__flush_tlb_one_user_pmc,(void*) &data,1);
+
+barrier();
+
 
 			++cnt;
 	}
@@ -291,7 +337,8 @@ long dwc(unsigned long src, unsigned long dst, unsigned long size) // double wal
 		spin_unlock(ptl_src);
 	if (ptl_dst != NULL)
 		spin_unlock(ptl_dst);
-
+//barrier();
+printk("done\n");
 	return 0;
 }
 
@@ -299,7 +346,7 @@ long dwc(unsigned long src, unsigned long dst, unsigned long size) // double wal
 SYSCALL_DEFINE3(pmc, void*, src, void*, dst, unsigned long, size)
 {
 
-		unsigned long /*cnt,*/src_addr,dst_addr;
+		unsigned long /*cnt,size2,*/src_addr,dst_addr;
 		long rv;
 
 //		printk("progamer mincheolgi choigo\n");
@@ -307,19 +354,25 @@ SYSCALL_DEFINE3(pmc, void*, src, void*, dst, unsigned long, size)
 	src_addr = (unsigned long)src;
 	dst_addr = (unsigned long)dst;
 
-	if ((src_addr % PAGE_SIZE != 0) || (dst_addr % PAGE_SIZE != 0) || (size % PAGE_SIZE != 0))
+	if (src_addr % PAGE_SIZE != 0 || dst_addr % PAGE_SIZE != 0 || size % PAGE_SIZE != 0)
 	{
+//			memmove(dst_addr,src_addr,size);
 			printk("align error %lx %lx %lx\n",src_addr,dst_addr,size);
 			rv = -1;
+//			return rv;
 	}
 	else
-		rv = dwc(src_addr,dst_addr,size/PAGE_SIZE);
 //		cnt = size / PAGE_SIZE;
+		rv = dwc(src_addr,dst_addr,size / PAGE_SIZE);
 //		rv = dwc(src,dst,cnt);
 
-//		memmove(dst+cnt*PAGE_SIZE,src+cnt*PAGE_SIZE,size-cnt*PAGE_SIZE);
+//		size2 = cnt*PAGE_SIZE;
+//		if (size != size2)
+//		memmove((void*)(dst_addr+size2),(void*)(src_addr+size2),size-size2);
+		/*
 		if (rv == -1)
 				printk("dwc error\n");
+				*/
 
 		return rv;
 }
@@ -357,4 +410,22 @@ SYSCALL_DEFINE4(pmc2, void*, src, void*, dst, void*, size, unsigned long, cnt)
 			
 		}
 		return rv;
+}
+
+SYSCALL_DEFINE0(pmcf)
+{
+//		preempt_disable();
+//		struct mm_struct *mm = current->mm;
+//		flush_tlb_mm(current->mm);
+//	flush_tlb_others(mm_cpumask(mm),mm,0UL,TLB_FLUSH_ALL);
+//printk("p0\n");
+printk("asid %lu\n",this_cpu_read(cpu_tlbstate.loaded_mm_asid));
+	/*
+	barrier();
+//		flush_tlb_all();
+	flush_tlb_all_pmc();		
+	barrier();
+	*/
+//	printk("p1\n");
+//	preempt_enable();
 }

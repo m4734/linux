@@ -849,10 +849,12 @@ __SYSCALL(__NR_fspick, sys_fspick)
 __SYSCALL(__NR_pmc, sys_pmc)
 #define __NR_pmc2 435 //cgmin
 __SYSCALL(__NR_pmc2, sys_pmc2)
+#define __NR_pmcf 436 //cgmin
+__SYSCALL(__NR_pmcf, sys_pmcf)
 
 
 #undef __NR_syscalls
-#define __NR_syscalls 436 // cgmin 434->436
+#define __NR_syscalls 437 // cgmin 434
 
 /*
  * 32 bit systems traditionally used different

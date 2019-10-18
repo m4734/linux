@@ -453,6 +453,44 @@ static inline void __native_flush_tlb_one_user(unsigned long addr)
 	else
 		invpcid_flush_one(user_pcid(loaded_mm_asid), addr);
 }
+struct pmc_data
+{
+		unsigned long addr;
+		u32 loaded_mm_asid;
+};
+static inline void __flush_tlb_one_user_pmc(struct pmc_data *data) //cgmin
+{
+//		printk("p0\n");
+//		__native_flush_tlb_one_user(*addr);
+//printk("one user %lu\n",addr);		
+	//	__native_flush_tlb_one_user(addr);
+
+//	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
+//	u32 loaded_mm_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
+
+	unsigned long addr = data->addr;
+	u32 loaded_mm_asid = data->loaded_mm_asid;
+printk("one user %lu %lu\n",addr,loaded_mm_asid);
+	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
+
+	if (!static_cpu_has(X86_FEATURE_PTI))
+		return;
+
+	/*
+	 * Some platforms #GP if we call invpcid(type=1/2) before CR4.PCIDE=1.
+	 * Just use invalidate_user_asid() in case we are called early.
+	 */
+//			invalidate_user_asid(loaded_mm_asid);
+
+	if (!this_cpu_has(X86_FEATURE_INVPCID_SINGLE))
+		invalidate_user_asid(loaded_mm_asid);
+	else
+	{
+			printk("pcid %lu\n",user_pcid(loaded_mm_asid));
+		invpcid_flush_one(user_pcid(loaded_mm_asid), addr);
+	}
+
+}
 
 /*
  * flush everything
@@ -474,6 +512,30 @@ static inline void __flush_tlb_all(void)
 		__flush_tlb();
 	}
 }
+
+static inline void __flush_tlb_all_pmc(void)
+{
+	unsigned long cr4, flags;
+	/*
+	 * This is to catch users with enabled preemption and the PGE feature
+	 * and don't trigger the warning in __native_flush_tlb().
+	 */
+//		printk("ttt\n");
+	VM_WARN_ON_ONCE(preemptible());
+
+	raw_local_irq_save(flags);
+
+	cr4 = this_cpu_read(cpu_tlbstate.cr4);
+	/* toggle PGE */
+	native_write_cr4(cr4 ^ X86_CR4_PGE);
+	/* write old PGE again and flush TLBs */
+	native_write_cr4(cr4);
+
+	raw_local_irq_restore(flags);
+
+//		__flush_tlb();
+}
+
 
 /*
  * flush one page in the kernel mapping
@@ -559,6 +621,8 @@ struct flush_tlb_info {
 				: PAGE_SHIFT, false)
 
 extern void flush_tlb_all(void);
+extern void flush_tlb_all_pmc(void); //cgmin
+extern void flush_tlb_one_user_pmc(unsigned long* addr); //cgmin
 extern void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 				unsigned long end, unsigned int stride_shift,
 				bool freed_tables);
